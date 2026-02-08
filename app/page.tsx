@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Chat() {
     const [messages, setMessages] = useState([
@@ -13,6 +14,7 @@ export default function Chat() {
     const [isLoading, setIsLoading] = useState(false);
 	const [dataset, setDataset] = useState(""); // "" = general chat
 	const [datasetConfirmed, setDatasetConfirmed] = useState(false);
+
 
 	async function sendMessage(e?: React.FormEvent) {
 		if (e) e.preventDefault();
@@ -60,22 +62,78 @@ export default function Chat() {
 			</div>
 
             <div className="space-y-4 pt-20 pb-28">
-                {messages.map((m, i) => (
-                    <div
-                        key={i}
-                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                        <div
-                            className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
-                                m.role === "user" 
-                                    ? "bg-indigo-500 text-white rounded-tr-none" 
-                                    : "bg-slate-800 text-slate-100 rounded-tl-none"
-                            }`}
-                        >
-                            {m.content}
-                        </div>
-                    </div>
-                ))}
+                {messages.map((m, i) => {
+					let chartData = null;
+					let displayContent = m.content;
+
+					// Check if content is a chart JSON
+					if (m.role === "model" && m.content.startsWith('{"type": "chart"')) {
+						try {
+							const parsed = JSON.parse(m.content);
+							displayContent = parsed.content;
+							chartData = parsed.chart_data;
+						} catch (e) {
+							console.error("JSON parse error", e);
+						}
+					}
+					return (
+						<div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+							<div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
+								m.role === "user" ? "bg-indigo-500 text-white rounded-tr-none" : "bg-slate-800 text-slate-100 rounded-tl-none"
+							}`}>
+								{displayContent}
+							</div>
+
+							
+							
+							{chartData && (
+								<div className="w-full h-64 mt-2 bg-slate-900 p-4 rounded-xl border border-slate-700 overflow-hidden">
+									<ResponsiveContainer width="100%" height="100%">
+									<LineChart data={chartData}>
+										<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+										<XAxis dataKey="year" stroke="#94a3b8" fontSize={12} />
+										<YAxis stroke="#94a3b8" fontSize={12} />
+										<Tooltip
+										contentStyle={{
+											backgroundColor: "#1e293b",
+											border: "none",
+											color: "#e5e7eb",
+										}}
+										/>
+										<Legend />
+
+										{(() => {
+										const agentKeys = Object.keys(chartData[0] || {}).filter(
+											(key) => key !== "year"
+										);
+
+										const generateColors = (count: number): string[] =>
+											Array.from({ length: count }, (_, i) => {
+												const hue = Math.round((360 / count) * i);
+												return `hsl(${hue}, 70%, 55%)`;
+											});
+
+										const colors = generateColors(agentKeys.length);
+
+										return agentKeys.map((agent, idx) => (
+											<Line
+											key={agent}
+											type="linear"
+											dataKey={agent}
+											stroke={colors[idx]}
+											strokeWidth={2}
+											dot={{ r: 3 }}
+											activeDot={{ r: 5 }}
+											/>
+										));
+										})()}
+									</LineChart>
+									</ResponsiveContainer>
+								</div>
+							)}
+						</div>
+					);
+				})}
                 {isLoading && (
                     <div className="flex justify-start">
                         <div className="bg-slate-800 text-slate-400 p-3 rounded-2xl rounded-tl-none text-xs animate-pulse">
@@ -88,7 +146,7 @@ export default function Chat() {
             <form onSubmit={sendMessage} className="fixed bottom-0 left-0 right-0 bg-white dark:bg-black border-t border-slate-200 dark:border-slate-700 p-4">
                 <div className="max-w-2xl mx-auto flex gap-2">
 					<input
-						className="w-80 border border-slate-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+						className="w-118 border border-slate-300 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
 						value={input}
 						onChange={e => setInput(e.target.value)}
 						placeholder="Type a message..."
@@ -111,18 +169,15 @@ export default function Chat() {
 						value={dataset}
 						onChange={(e) => {
 							const selected = e.target.value;
-							setDataset(selected);
-
-							// Show confirmation system message immediately
 							const agentName = selected || "TARS";
-							const systemMessage = {
+							
+							const confirmationMsg = {
 								role: "model",
 								content: `You have selected ${agentName}. Please ask a question.`
 							};
-							setMessages(prev => [...prev, systemMessage]);
 
-							// Reset datasetConfirmed if you still need it elsewhere
-							setDatasetConfirmed(true); // mark confirmation sent
+							setDataset(selected);
+							setMessages(prev => [...prev, confirmationMsg]);
 						}}
 
 					>
