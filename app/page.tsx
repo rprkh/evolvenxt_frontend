@@ -3,8 +3,15 @@
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
+type Message = {
+    role: string;
+    content: string;
+    show_buttons?: boolean;
+    buttons?: string[];
+};
+
 export default function Chat() {
-    const [messages, setMessages] = useState([
+    const [messages, setMessages] = useState<Message[]>([
         { 
             role: "model", 
             content: "Hi, my name is TARS. I am here to answer your questions. Please select which dataset you want answers for (DS-1 or DS-2) from the dropdown. Alternatively, you can leave it as TARS for general conversations." 
@@ -43,7 +50,12 @@ export default function Chat() {
 
 			setMessages(prev => [
 				...prev,
-				{ role: "model", content: data.response }
+				{ 
+					role: "model", 
+					content: data.response,
+					show_buttons: data.show_buttons,
+					buttons: data.buttons
+				}
 			]);
 		} catch (error) {
 			console.error(error);
@@ -78,13 +90,54 @@ export default function Chat() {
 					}
 					return (
 						<div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
-							<div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
+							<div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm whitespace-pre-line ${
 								m.role === "user" ? "bg-indigo-500 text-white rounded-tr-none" : "bg-slate-800 text-slate-100 rounded-tl-none"
 							}`}>
 								{displayContent}
 							</div>
 
-							
+							{m.show_buttons && m.buttons && (
+								<div className="flex gap-2 mt-2">
+									{m.buttons.map((btn: string, idx: number) => (
+										<button
+											key={idx}
+											onClick={async () => {
+												const userMessage = { role: "user", content: btn };
+												setMessages(prev => [...prev, userMessage]);
+												setIsLoading(true);
+
+												try {
+													const payload = {
+														history: [...messages, userMessage],
+														message: btn,
+														dataset: dataset || null
+													};
+
+													const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/chat`, {
+														method: "POST",
+														headers: { "Content-Type": "application/json" },
+														body: JSON.stringify(payload)
+													});
+
+													const data = await res.json();
+
+													setMessages(prev => [
+														...prev,
+														{ role: "model", content: data.response }
+													]);
+												} catch (error) {
+													console.error(error);
+												} finally {
+													setIsLoading(false);
+												}
+											}}
+											className="px-4 py-2 bg-zinc-700 text-white rounded-lg hover:bg-indigo-700 transition-all"
+										>
+											{btn}
+										</button>
+									))}
+								</div>
+							)}					
 							
 							{chartData && (
 								<div className="w-full h-64 mt-2 bg-slate-900 p-4 rounded-xl border border-slate-700 overflow-hidden">
