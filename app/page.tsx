@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+	LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
+	Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
+	PieLabelRenderProps
+} from 'recharts';
 
 type Message = {
     role: string;
@@ -142,45 +146,117 @@ export default function Chat() {
 							{chartData && (
 								<div className="w-full h-64 mt-2 bg-slate-900 p-4 rounded-xl border border-slate-700 overflow-hidden">
 									<ResponsiveContainer width="100%" height="100%">
-									<LineChart data={chartData}>
-										<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-										<XAxis dataKey="year" stroke="#94a3b8" fontSize={12} />
-										<YAxis stroke="#94a3b8" fontSize={12} />
-										<Tooltip
-										contentStyle={{
-											backgroundColor: "#1e293b",
-											border: "none",
-											color: "#e5e7eb",
-										}}
-										/>
-										<Legend />
-
 										{(() => {
-										const agentKeys = Object.keys(chartData[0] || {}).filter(
-											(key) => key !== "year"
-										);
+											const parsed = JSON.parse(m.content);
+											const chartType = parsed.chart_type || "line";
 
-										const generateColors = (count: number): string[] =>
-											Array.from({ length: count }, (_, i) => {
-												const hue = Math.round((360 / count) * i);
-												return `hsl(${hue}, 70%, 55%)`;
-											});
+											if (chartType === "pie") {
+												const COLORS = ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
+												
+												return (
+													<PieChart>
+														<Pie
+															data={chartData}
+															cx="50%"
+															cy="50%"
+															labelLine={false}
+															label={(props: PieLabelRenderProps) => {
+																const percent = props.percent || 0;
+																const name = props.name || 'Unknown';
+																return `${name}: ${(percent * 100).toFixed(0)}%`;
+															}}
+															outerRadius={80}
+															fill="#8884d8"
+															dataKey="value"
+														>
+															{chartData.map((entry: { name: string; value: number }, index: number) => (
+																<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+															))}
+														</Pie>
+														<Tooltip
+															contentStyle={{
+																backgroundColor: "#1e293b",
+																border: "none",
+																color: "#e5e7eb",
+															}}
+														/>
+													</PieChart>
+												);
+											}
 
-										const colors = generateColors(agentKeys.length);
+											if (chartType === "bar") {
+												const dataKeys = Object.keys(chartData[0] || {}).filter(
+													(key) => key !== "period" && key !== "year"
+												);
 
-										return agentKeys.map((agent, idx) => (
-											<Line
-											key={agent}
-											type="linear"
-											dataKey={agent}
-											stroke={colors[idx]}
-											strokeWidth={2}
-											dot={{ r: 3 }}
-											activeDot={{ r: 5 }}
-											/>
-										));
+												const generateColors = (count: number): string[] =>
+													Array.from({ length: count }, (_, i) => {
+														const hue = Math.round((360 / count) * i);
+														return `hsl(${hue}, 70%, 55%)`;
+													});
+
+												const colors = generateColors(dataKeys.length);
+
+												return (
+													<BarChart data={chartData}>
+														<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+														<XAxis dataKey="period" stroke="#94a3b8" fontSize={12} />
+														<YAxis stroke="#94a3b8" fontSize={12} />
+														<Tooltip
+															contentStyle={{
+																backgroundColor: "#1e293b",
+																border: "none",
+																color: "#e5e7eb",
+															}}
+														/>
+														<Legend />
+														{dataKeys.map((key, idx) => (
+															<Bar key={key} dataKey={key} fill={colors[idx]} />
+														))}
+													</BarChart>
+												);
+											}
+
+											// Default: line chart
+											const agentKeys = Object.keys(chartData[0] || {}).filter(
+												(key) => key !== "period" && key !== "year"
+											);
+
+											const generateColors = (count: number): string[] =>
+												Array.from({ length: count }, (_, i) => {
+													const hue = Math.round((360 / count) * i);
+													return `hsl(${hue}, 70%, 55%)`;
+												});
+
+											const colors = generateColors(agentKeys.length);
+
+											return (
+												<LineChart data={chartData}>
+													<CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+													<XAxis dataKey="period" stroke="#94a3b8" fontSize={12} />
+													<YAxis stroke="#94a3b8" fontSize={12} />
+													<Tooltip
+														contentStyle={{
+															backgroundColor: "#1e293b",
+															border: "none",
+															color: "#e5e7eb",
+														}}
+													/>
+													<Legend />
+													{agentKeys.map((agent, idx) => (
+														<Line
+															key={agent}
+															type="linear"
+															dataKey={agent}
+															stroke={colors[idx]}
+															strokeWidth={2}
+															dot={{ r: 3 }}
+															activeDot={{ r: 5 }}
+														/>
+													))}
+												</LineChart>
+											);
 										})()}
-									</LineChart>
 									</ResponsiveContainer>
 								</div>
 							)}
